@@ -1,22 +1,43 @@
-source('amcatr.r')
-source('amcat_getdata.r')
-source('lda_lib.r')
+source('../amcat-r/amcatr.r')
+source('../amcat-r/features.r')
+source('lda.r')
 
-conn = amcat.connect('http://amcat-dev.labs.vu.nl') # AmCAT vraagt om je inloggegevens
+conn = amcat.connect('http://amcat.vu.nl') # AmCAT vraagt om je inloggegevens
 
-articleset_id = 6438 # Columns Youp (n = 1323)
+articleset_id = 7927 # query "eu", 4 krangen, december 2013 (n = 370)
 features = amcat.features(conn, articleset_id)
 
-## Het is nog steeds mogelijk om een reference set te gebruiken om woorden te filteren. Volgens mij is dit echter niet cruciaal als er al gefilterd is op woord-document frequentie en POS tags.
-## In lda.prepareFeatures kun je woorden filteren met docfreq.thres en docfreq_pct.max:
-##    docfreq.thres: minimum aantal artikelen waarin een woord moet voorkomen (filtert 'too_rare' woorden weg)
-##    docfreq_pct.max: Een percentage (1-100). het woord mag niet voorkomen in meer dan dit percentage van het totaal aantal artikelen (filtert 'too_common' woorden weg) )
-## De beste waarde voor docfreq_pct.max is zeer afhankelijk van de data. Voor veel verschillende onderwerpen in kranten zijn veel voorkomende woorden niet 
-## interessant, maar bij columns van dezelfde auteur zou je dan stijlelementen kunnen missen. 
-data = lda.prepareFeatures(features, docfreq.thres=5, docfreq_pct.max=25) # Nog splitten in prepareVocabulary en prepareMatrix
+ldadata = lda.prepareFeatures(features, docfreq.thres=3, docfreq_pct.max=50, use.pos=c('noun','verb','NN'))
+m = lda.cluster(ldadata, nclusters=25, niterations=100)
 
-m = lda.cluster(data$matrix, data$voca$word, nclusters=30, niterations=100)
+top.topic.words(m$topics)
 
-write.csv(top.topic.words(m$topics), file='/tmp/out.csv')
+## get meta for more fun ##
 
-## Zie eventueel amcat_featurestream.r voor aantekeningen over wat amcat.getFeatures nu doet en welke parameters nog toegevoegd kunnen worden.
+meta = amcat.getMeta(conn, articleset_id)
+m = lda.addMeta(m, meta)
+
+### select and name clusters
+labels = list("cluster1"=1,
+              "cluster2"=c(1,2),
+              "cluster3"=5)
+
+cluster.doc = lda.getclusters(m, labels) # niet geaggregeerd: waardes zijn aantal woorden per artikel (rij) dat aan cluster (kolom) toegekend is
+head(cluster.doc)
+
+# Artikelen met meer woorden (meta$length) hebben vanzelfsprekend een hogere score op clusters:
+# Daarom kan het nuttig zijn om hierop te wegen (maar niet altijd, want als we per tijdseenheid of medium kijken, dan kunnen we lange artikelen ook juist zwaarder willen laten wegen)
+cluster.doc = lda.getclusters(m, labels, weight.length=T) # op lengte wegen kan met weight.length=TRUE
+head(cluster.doc)
+
+# lda.getcluster kan ook aggregeren:
+lda.getclusters(m, labels, date='day') # aggregeer op datum, default is aggfunc='sum' (hier kunnen we ook wegen op length, maar dan zouden we korte en lange artikelen als even belangrijk zien, wat we niet willen denk ik)
+lda.getclusters(m, labels, date='year') # aggregeer op datum per 'day','week', 'month', of 'year'
+lda.getclusters(m, labels, media=T) # aggregeer op medium
+lda.getclusters(m, labels, date='week',media=T) # aggregeer op beide
+
+# met print.plot kun je dan ook direct plotten
+cluster.date = lda.getclusters(m, labels, date='week', print.plot=T)
+cluster.medium = lda.getclusters(m, labels, media=T, print.plot=T)
+cluster.datemed = lda.getclusters(m, labels, date='day', media=T, print.plot=T)
+
