@@ -5,7 +5,7 @@ source('lda_lib.r')
 conn = amcat.connect('http://amcat-dev.labs.vu.nl') # AmCAT vraagt om je inloggegevens
 
 articleset_id = 6438 # Columns Youp (n = 1323)
-features = amcat.getFeatures(conn, articleset_id)
+features = amcat.features(conn, articleset_id)
 
 ## Het is nog steeds mogelijk om een reference set te gebruiken om woorden te filteren. Volgens mij is dit echter niet cruciaal als er al gefilterd is op woord-document frequentie en POS tags.
 ## In lda.prepareFeatures kun je woorden filteren met docfreq.thres en docfreq_pct.max:

@@ -6,7 +6,7 @@ source('associations_lib.r')
 conn = amcat.connect('http://amcat.vu.nl') # AmCAT vraagt om je inloggegevens
 articlesets = c(4626) # hier alle articlesets invoeren: c(articleset1, articleset2, ...)
 queries = c('pvda', 'cda', 'vvd') 
-h = query.hits(conn, queries, sets=articlesets)
+h = amcat.hits(conn, queries, sets=articlesets)
 
 # All associations
 associations.from.hits(h$count, h$id, h$query)

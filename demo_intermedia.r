@@ -2,6 +2,8 @@ source('amcatr.r')
 source('amcat_getdata.r')
 source('intermedia_lib.r')
 
+#### WvA: DEZE DEMO WERKT VOLGENS MIJ NIET MEER, HITS/META ZIJN NU SAMEN IN AMCAT.HITS
+
 ##### INLOGGEN OP AMCAT #####
 conn = amcat.connect('http://amcat.vu.nl') # AmCAT vraagt om je inloggegevens
 
