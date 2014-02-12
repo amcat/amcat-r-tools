@@ -1,5 +1,7 @@
 library(lda)
 library(reshape)
+library(topicmodels)
+library(slam)
 
 lda.create.matrix <- function(wordnrs, freqs, documents) {
     # wordnrs = vector of word indexes into voca
@@ -39,6 +41,16 @@ lda.addMeta <- function(lda_output, meta){
   lda_output
 }
 
+lda.dataframe_to_dtmatrix <- function(dataframe, document_var='id', term_var='word', value_var='hits', weight_function=weightTf){
+  documents = unique(dataframe[,document_var])
+  terms = unique(dataframe[,term_var])
+  m = simple_triplet_matrix(match(dataframe[,document_var], ids), 
+                            match(dataframe[,term_var], terms), 
+                            dataframe[,value_var], 
+                            dimnames=list(documents=as.character(documents), words=as.character(terms)))
+  as.DocumentTermMatrix(m, weighting=weight_function)
+}
+
 
 lda.selectclusters <- function(model, selection) {
   w = t(model$document_sums)
@@ -52,10 +64,6 @@ lda.selectclusters <- function(model, selection) {
   colnames(result) <- names(selection)
   result
 }
-
-test = as.Date('2010-02-28')
-test = format(test, '%Y-%W')
-as.Date(paste(test,1), '%Y-%W %u')
 
 lda.getclusters <- function(clusters, labels, date=NULL, media=FALSE, aggfunc='sum', weight.length=F, column.pct=F, print.plot=F) { 
   m = lda.selectclusters(clusters, labels)
