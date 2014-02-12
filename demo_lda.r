@@ -1,6 +1,6 @@
 setwd("~/projects/amcat-r-tools")
-source('../amcat-r/amcatr.r')
-source('../amcat-r/features.r')
+source('../amcat-r/R/amcatr.r')
+source('../amcat-r/R/features.r')
 source('lda.r')
 
 conn = amcat.connect('http://amcat.vu.nl') # AmCAT vraagt om je inloggegevens

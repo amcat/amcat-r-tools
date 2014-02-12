@@ -2,6 +2,7 @@ library(lda)
 library(reshape)
 library(topicmodels)
 library(slam)
+library(tm)
 
 lda.create.matrix <- function(wordnrs, freqs, documents) {
     # wordnrs = vector of word indexes into voca
@@ -44,7 +45,7 @@ lda.addMeta <- function(lda_output, meta){
 lda.dataframe_to_dtmatrix <- function(dataframe, document_var='id', term_var='word', value_var='hits', weight_function=weightTf){
   documents = unique(dataframe[,document_var])
   terms = unique(dataframe[,term_var])
-  m = simple_triplet_matrix(match(dataframe[,document_var], ids), 
+  m = simple_triplet_matrix(match(dataframe[,document_var], documents), 
                             match(dataframe[,term_var], terms), 
                             dataframe[,value_var], 
                             dimnames=list(documents=as.character(documents), words=as.character(terms)))
