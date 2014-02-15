@@ -1,5 +1,5 @@
 codebook.getChildren <- function(hierarchy, code){
-  children = as.character(hierarchy[hierarchy$parent==code,]$code)
+  children = as.character(hierarchy[!is.na(hierarchy$parent) & hierarchy$parent==code,]$code)
   allchildren = children
   while(length(children) > 0){
     children = as.character(hierarchy[hierarchy$parent %in% children,]$code)
