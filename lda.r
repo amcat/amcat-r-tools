@@ -3,55 +3,60 @@ library(reshape)
 library(topicmodels)
 library(slam)
 library(tm)
+library(wordcloud)
+library(RColorBrewer)
 
-lda.create.matrix <- function(wordnrs, freqs, documents) {
-    # wordnrs = vector of word indexes into voca
-    # freqs = vector of frequencies of the same length as words
-    # documents = vector of documents indices that has the samen length as words
-    # voca = character vector of words
-    
-    docs = unique(documents)
-    
-    n = length(docs)
-    corpus = vector("list", n)
-    i = 2
-    for (i in 1:n) {
-      if (i%%100 == 0) print(paste("Document",i," / ", n))
-      
-      select = documents == docs[i]
-      
-      corpus[[i]] = matrix(as.integer(c(wordnrs[select] - 1, freqs[select])), nrow=2, byrow=T)
-    }
-    corpus
+amcat.plot.lda <- function(corpus, path='/tmp/clouds/'){
+  for(i in 1:nrow(corpus$document_sums)){
+    print(paste('Plotting:',i))
+    fn = paste(path, i, ".png", sep="")
+    if (!is.null(fn)) png(fn, width=1280,height=800)
+    par(mar=c(4.5,4.5,2,2), cex.axis=1.7)
+    layout(matrix(c(1,1,2,3), 2, 2, byrow = TRUE), widths=c(2.5,1.5), heights=c(1,2))
+    amcat.plot.lda.date(corpus, date, i)
+    amcat.plot.lda.wordcloud(corpus, i)
+    par(mar=c(11,4.5,2,6))
+    amcat.plot.lda.medium(corpus, i)
+    if (!is.null(fn)) dev.off()
   }
-
-lda.cluster <- function(ldadata, nclusters = 25, niterations=25) {
-  m = lda.collapsed.gibbs.sampler(ldadata$matrix,
-                                  nclusters,
-                                  ldadata$voca$word,
-                                  niterations,
-                                  0.1,
-                                  0.1,
-                                  compute.log.likelihood=TRUE)
-  m = c(m, list(article_ids = ldadata$article_ids))
-  m
 }
 
-lda.addMeta <- function(lda_output, meta){
-  lda_output = c(lda_output, list(meta=meta[match(lda_output$article_ids, meta$id),]))
-  lda_output
+amcat.plot.lda.date <- function(corpus, date, i, pct=T){
+  if(date == 'day') d = as.Date(format(corpus$meta$date, '%Y-%m-%d'))
+  if(date == 'month') d = as.Date(paste(format(corpus$meta$date, '%Y-%m'),'-01',sep=''))
+  if(date == 'week') d = as.Date(paste(format(corpus$meta$date, '%Y-%W'),1), '%Y-%W %u')
+  if(date == 'year') d = as.Date(paste(format(corpus$meta$date, '%Y'),'-01-01',sep=''))
+  
+  values = corpus$document_sums[i,]
+  if(pct == T) values = values / sum(values)
+  agg = aggregate(values, by=list(date=d), FUN='sum')
+  plot(agg$date, agg$x, type='l', xlab='', main='', ylab='',
+       xlim=c(min(agg$date), max(agg$date)), ylim=c(0, max(agg$x)), bty='L', lwd=5)
 }
 
-lda.dataframe_to_dtmatrix <- function(dataframe, document_var='id', term_var='word', value_var='hits', weight_function=weightTf){
-  documents = unique(dataframe[,document_var])
-  terms = unique(dataframe[,term_var])
-  m = simple_triplet_matrix(match(dataframe[,document_var], documents), 
-                            match(dataframe[,term_var], terms), 
-                            dataframe[,value_var], 
-                            dimnames=list(documents=as.character(documents), words=as.character(terms)))
-  as.DocumentTermMatrix(m, weighting=weight_function)
+amcat.plot.lda.medium <- function(corpus, i, pct=T){
+  medium = corpus$meta$medium
+  values = corpus$document_sums[i,]
+  if(pct == T) values = values / sum(values)
+  agg = aggregate(values, by=list(medium=medium), FUN='sum')
+  colors=rainbow(nrow(agg))
+  barplot(t(agg$x), main='', beside=TRUE,horiz=FALSE,
+          density=NA,
+          col='lightgrey',
+          xlab='',
+          ylab="",
+          axes=TRUE, names.arg=agg$medium, cex.names=1.5, cex.axis=1.5, adj=1, las=2)
 }
 
+
+amcat.plot.lda.wordcloud <- function(corpus, i){
+  x = corpus$topics[i,]
+  x = sort(x[x>5], decreasing=T)[1:100]
+  names = sub("/.*", "", names(x))
+  freqs = x**.5
+  pal <- brewer.pal(6,"YlGnBu")
+  wordcloud(names, freqs, scale=c(6,.5),min.freq=1, max.words=Inf, random.order=FALSE, rot.per=.15, colors=pal)
+}
 
 lda.selectclusters <- function(model, selection) {
   w = t(model$document_sums)
@@ -153,65 +158,3 @@ chi2 <- function(a,b,c,d) {
    +  ooe(d, (d+b)*(c+d)/tot))
 }
 
-fixUnitId <- function(data){
-  ## if unit_level is 'paragraph' or 'sentence', merge parnr/sentnr into article id 
-  if('paragraph' %in% colnames(data) | 'sentence' %in% colnames(data)){ 
-    data$id = as.character(data$id)
-    if('paragraph' %in% colnames(data)) data$id = paste(data$id,data$paragraph, sep='-')
-    if('sentence' %in% colnames(data)) data$id = paste(data$id,data$sentence, sep='-')  
-    data$id = as.factor(data$id)
-  }
-  data$id
-}
-
-lda.prepareFeatures <- function(features, features.reference=data.frame(), docfreq.thres=5, docfreq_pct.max=50, over.thres=1.5, chi.thres=5, use.pos=c()) {
-  ## prepares data for LDA. 
-  ## A reference set can be given in order to filter words based on frequency difference
-  ## docfreq.thres and docfreq_pct.max apply to features set only
-  ## use docfreq.thres to filter words on a minimum nr of documents in which they occur
-  ## use docfreq_pct.max to filter words on the maximum percentage of documents in the corpus
-  features$id = fixUnitId(features)
-  
-  if (docfreq_pct.max < 100 | docfreq.thres > 0) {
-    print('Calculating document frequency')
-    docfreq = aggregate(hits ~ word, features, FUN='length') # in how many documents does a word occur?
-    too_rare = docfreq$word[docfreq$hits < docfreq.thres]
-    docfreq$docfreq_pct = (docfreq$hits / length(unique(features$id))) * 100
-    too_common = docfreq$word[docfreq$docfreq_pct > docfreq_pct.max]
-    print(paste('  ', length(too_rare), 'words are too rare (< docfreq.thres)'))
-    print(paste('  ',length(too_common), 'words are too common (> docfreq_pct.max)'))
-  }
-  
-  print('Selecting vocabulary')
-  if (length(use.pos) > 0) {
-    print(paste('  ', 'Only using words with POS tag:', paste(use.pos,collapse=', ')))
-    features = features[features$pos %in% use.pos,]
-    if(nrow(features.reference) > 0) features.reference = features.reference[features.reference$pos %in% use.pos,]
-  }
-  
-  if(nrow(features.reference) > 0){
-    features.all = rbind(features, features.reference)
-    features.all$source = c(rep('target', nrow(features)), rep('reference', nrow(features.reference)))
-    
-    words = cast(features.all, word + pos ~ source, value="hits", fun.aggregate=sum)
-    if (docfreq.thres > 0) words = words[!words$word %in% too_rare,]
-    if (docfreq_pct.max < 100) words = words[!words$word %in% too_common,]
-    
-    words$chi = chi2(words$target, words$reference, sum(words$target) - words$target, sum(words$reference) - words$reference)
-    words$over = (words$target / words$reference) / (sum(words$reference) / sum(words$target))
-    
-    voca = words[words$over > over.thres & words$chi > chi.thres,]
-    voca = voca[order(voca$over),]
-  } else {
-    words = aggregate(hits ~ word + pos, features, FUN='sum')
-    if (docfreq.thres > 0) words = words[!words$word %in% too_rare,]
-    if (docfreq_pct.max < 100) words = words[!words$word %in% too_common,]
-    voca = words
-  }
-  
-  print(paste('  ','Vocabulary size =', nrow(voca)))
-  print('Building matrix')
-  features = features[features$word %in% voca$word,]
-  ldamatrix = lda.create.matrix(match(features$word, voca$word), features$hits, features$id)
-  list(matrix=ldamatrix, voca=voca, article_ids=unique(features$id))
-}

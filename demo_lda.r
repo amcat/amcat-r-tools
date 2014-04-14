@@ -1,6 +1,6 @@
 setwd("~/projects/amcat-r-tools")
 source('../amcat-r/R/amcatr.r')
-source('../amcat-r/R/features.r')
+source('../amcat-r/R/corpus.r')
 source('lda.r')
 
 conn = amcat.connect('http://amcat.vu.nl') # AmCAT vraagt om je inloggegevens
@@ -13,9 +13,9 @@ m = lda.cluster(ldadata, nclusters=25, niterations=100)
 top.topic.words(m$topics)
 
 # alternatief (topicmodels package)
-dt = lda.dataframe_to_dtmatrix(features) # document-term matrix in sparsematrix structuur van tm
-lda = LDA(dt, 25, LDAcontrol=list(iter=100))
-terms(lda, 10) 
+#dt = lda.dataframe_to_dtmatrix(features) # document-term matrix in sparsematrix structuur van tm
+#lda = LDA(dt, 25, LDAcontrol=list(iter=100))
+#terms(lda, 10) 
 
 
 ## get meta for more fun ##
