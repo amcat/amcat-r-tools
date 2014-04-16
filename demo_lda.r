@@ -27,3 +27,9 @@ meta = amcat.getarticlemeta(conn, articleset_id)
 m = amcat.lda.addMeta(m, meta)
 
 amcat.plot.lda(m, date_interval='year', path='/tmp/clouds/')
+
+
+## in progress
+## Plot model fit for different values of K (takes a long time as it calculats a model for every value in k_values)
+source('lda_ktests.r')
+fit_scores = amcat.lda.find.best.K(dtm, k_values=seq(2,100,10))
